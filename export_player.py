@@ -17,6 +17,7 @@ import genpy
 import tf2_ros
 import numpy as np
 from tf.transformations import *
+from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
 
 class Player:
@@ -24,6 +25,7 @@ class Player:
         parser = argparse.ArgumentParser()
         parser.add_argument("data_path", type=str, help="path to data")
         parser.add_argument("-l", "--loop", action='store_true', help="loop over files")
+        parser.add_argument("-s", "--service", action='store_true', help="publish files on service")
         parser.add_argument("-f", "--frequency", type=float, default=30.0, help="replay frequency")
         parser.add_argument("-i", "--index", type=int, default=None, help="index of image")
         args = parser.parse_args()
@@ -32,7 +34,7 @@ class Player:
         dlist = sorted(glob.glob(os.path.join(args.data_path, "depth", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
 
         js = np.genfromtxt(os.path.join(args.data_path, "sol_joints.csv"), dtype=None, encoding="utf8", names=True)
-        joint_names = js.dtype.names
+        self.joint_names = js.dtype.names
 
         if args.index is not None:
             clist = [clist[args.index]]
@@ -53,15 +55,15 @@ class Player:
 
         rospy.init_node("export_player")
 
-        pub_clock = rospy.Publisher("/clock", Clock, queue_size=1)
-        pub_colour = rospy.Publisher("/camera/rgb/image_rect_color/compressed", CompressedImage, queue_size=1)
-        pub_ci_colour = rospy.Publisher("/camera/rgb/camera_info", CameraInfo, latch=True, queue_size=1)
+        self.pub_clock = rospy.Publisher("/clock", Clock, queue_size=1)
+        self.pub_colour = rospy.Publisher("/camera/rgb/image_rect_color/compressed", CompressedImage, queue_size=1)
+        self.pub_ci_colour = rospy.Publisher("/camera/rgb/camera_info", CameraInfo, latch=True, queue_size=1)
         # pub_depth = rospy.Publisher("/camera/depth/image_rect_raw/compressed", CompressedImage, queue_size=1)
-        pub_depth = rospy.Publisher("/camera/depth/image_rect_raw", Image, queue_size=1)
-        pub_ci_depth = rospy.Publisher("/camera/depth/camera_info", CameraInfo, latch=True, queue_size=1)
-        pub_joints = rospy.Publisher("/joint_states", JointState, latch=True, queue_size=1)
+        self.pub_depth = rospy.Publisher("/camera/depth/image_rect_raw", Image, queue_size=1)
+        self.pub_ci_depth = rospy.Publisher("/camera/depth/camera_info", CameraInfo, latch=True, queue_size=1)
+        self.pub_joints = rospy.Publisher("/joint_states", JointState, latch=True, queue_size=1)
 
-        ci = CameraInfo(width=cp['width'], height=cp['height'],
+        self.ci = CameraInfo(width=cp['width'], height=cp['height'],
                         K=[cp['fu'],0,cp['cx'],0,cp['fv'], cp['cy'],0,0,1],
                         P=[cp['fu'],0,cp['cx'],0,0,cp['fv'],cp['cy'],0,0,0,1,0])
 
@@ -75,49 +77,65 @@ class Player:
         camera_pose.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
         camera_pose.child_frame_id = base_frame
         camera_pose.header.frame_id = camera_frame
+        self.camera_pose = camera_pose
 
-        cvbridge = cv_bridge.CvBridge()
+        self.cvbridge = cv_bridge.CvBridge()
 
-        broadcaster = tf2_ros.StaticTransformBroadcaster()
+        self.broadcaster = tf2_ros.StaticTransformBroadcaster()
 
         if args.loop:
             file_list = cycle(zip(clist, dlist, js))
         else:
             file_list = zip(clist, dlist, js)
 
-        for cpath, dpath, jp in file_list:
-            now = genpy.Time().from_sec(time.time())
-            hdr = Header(stamp=now, frame_id=camera_frame)
+        if args.service:
+            self.list_iter = iter(file_list)
+            rospy.Service("next", Empty, self.next_set)
+            rospy.spin()
+        else:
+            for cpath, dpath, jp in file_list:
+                self.send(cpath, dpath, jp)
+                if rospy.is_shutdown():
+                    break
+                time.sleep(1/float(args.frequency))
 
-            pub_clock.publish(clock=now)
+    def next_set(self, req):
+        try:
+            cpath, dpath, jp = self.list_iter.next()
+            self.send(cpath, dpath, jp)
+        except StopIteration:
+            print("end of list")
+            rospy.signal_shutdown("end of file")
+        return EmptyResponse()
 
-            # print("cimg:", cpath)
+    def send(self, cpath, dpath, jp):
+        now = genpy.Time().from_sec(time.time())
+        hdr = Header(stamp=now, frame_id=self.camera_pose.header.frame_id)
 
-            camera_pose.header.stamp = hdr.stamp
-            broadcaster.sendTransform(camera_pose)
+        self.pub_clock.publish(clock=now)
 
-            cimg = cv2.imread(cpath, cv2.IMREAD_UNCHANGED)  # bgr8
-            msg_cimg = cvbridge.cv2_to_compressed_imgmsg(cimg, dst_format="jpg")
-            msg_cimg.header = hdr
+        # print("cimg:", cpath)
 
-            dimg = cv2.imread(dpath, cv2.IMREAD_UNCHANGED)
-            #msg_dimg = cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
-            msg_dimg = cvbridge.cv2_to_imgmsg(dimg, encoding="mono16")
-            msg_dimg.header = hdr
+        self.camera_pose.header.stamp = hdr.stamp
+        self.broadcaster.sendTransform(self.camera_pose)
 
-            pub_colour.publish(msg_cimg)
-            pub_depth.publish(msg_dimg)
+        cimg = cv2.imread(cpath, cv2.IMREAD_UNCHANGED)  # bgr8
+        msg_cimg = self.cvbridge.cv2_to_compressed_imgmsg(cimg, dst_format="jpg")
+        msg_cimg.header = hdr
 
-            ci.header = hdr
-            pub_ci_colour.publish(ci)
-            pub_ci_depth.publish(ci)
+        dimg = cv2.imread(dpath, cv2.IMREAD_UNCHANGED)
+        # msg_dimg = cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
+        msg_dimg = self.cvbridge.cv2_to_imgmsg(dimg, encoding="mono16")
+        msg_dimg.header = hdr
 
-            pub_joints.publish(name=joint_names, position=jp, header=hdr)
+        self.pub_colour.publish(msg_cimg)
+        self.pub_depth.publish(msg_dimg)
 
-            if rospy.is_shutdown():
-                break
+        self.ci.header = hdr
+        self.pub_ci_colour.publish(self.ci)
+        self.pub_ci_depth.publish(self.ci)
 
-            time.sleep(1/float(args.frequency))
+        self.pub_joints.publish(name=self.joint_names, position=jp, header=hdr)
 
 
 if __name__ == '__main__':
