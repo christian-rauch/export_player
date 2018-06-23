@@ -25,7 +25,7 @@ class Player:
         parser.add_argument("data_path", type=str, help="path to data")
         parser.add_argument("-l", "--loop", action='store_true', help="loop over files")
         parser.add_argument("-f", "--frequency", type=float, default=30.0, help="replay frequency")
-        parser.add_argument("-i", "--index", type=int, help="index of image")
+        parser.add_argument("-i", "--index", type=int, default=None, help="index of image")
         args = parser.parse_args()
 
         clist = sorted(glob.glob(os.path.join(args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
@@ -34,7 +34,7 @@ class Player:
         js = np.genfromtxt(os.path.join(args.data_path, "sol_joints.csv"), dtype=None, encoding="utf8", names=True)
         joint_names = js.dtype.names
 
-        if args.index:
+        if args.index is not None:
             clist = [clist[args.index]]
             dlist = [dlist[args.index]]
             js    = [js[args.index]]
