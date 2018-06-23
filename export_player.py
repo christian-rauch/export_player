@@ -84,28 +84,34 @@ class Player:
         self.broadcaster = tf2_ros.StaticTransformBroadcaster()
 
         if args.loop:
-            file_list = cycle(zip(clist, dlist, js))
+            self.file_list = cycle(zip(clist, dlist, js))
         else:
-            file_list = zip(clist, dlist, js)
+            self.file_list = zip(clist, dlist, js)
 
         if args.service:
-            self.list_iter = iter(file_list)
-            rospy.Service("next", Empty, self.next_set)
+            rospy.Service("~reset", Empty, self.reset_iter)
+            self.reset_iter(EmptyRequest())
+            rospy.Service("~next", Empty, self.next_set)
             rospy.spin()
         else:
-            for cpath, dpath, jp in file_list:
+            for cpath, dpath, jp in self.file_list:
                 self.send(cpath, dpath, jp)
                 if rospy.is_shutdown():
                     break
                 time.sleep(1/float(args.frequency))
+
+    def reset_iter(self, req):
+        # print("reset")
+        self.list_iter = iter(self.file_list)
+        return EmptyResponse()
 
     def next_set(self, req):
         try:
             cpath, dpath, jp = self.list_iter.next()
             self.send(cpath, dpath, jp)
         except StopIteration:
-            print("end of list")
-            rospy.signal_shutdown("end of file")
+            print("end of log")
+            rospy.signal_shutdown("end of log")
         return EmptyResponse()
 
     def send(self, cpath, dpath, jp):
