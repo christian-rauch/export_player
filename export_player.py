@@ -6,7 +6,7 @@ import argparse
 import glob
 import os
 import json
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import CompressedImage, Image, CameraInfo, JointState
 from rosgraph_msgs.msg import Clock
 from geometry_msgs.msg import TransformStamped, Vector3, Quaternion
@@ -55,7 +55,6 @@ class Player:
         # transformation from camera to world
         camera_pose_mat = np.linalg.inv(camera_pose_mat)
 
-
         rospy.init_node("export_player")
 
         self.pub_clock = rospy.Publisher("/clock", Clock, queue_size=1)
@@ -65,6 +64,7 @@ class Player:
         self.pub_depth = rospy.Publisher("/camera/depth/image_rect_raw", Image, queue_size=1)
         self.pub_ci_depth = rospy.Publisher("/camera/depth/camera_info", CameraInfo, latch=True, queue_size=1)
         self.pub_joints = rospy.Publisher("/joint_states", JointState, latch=True, queue_size=1)
+        self.pub_eol = rospy.Publisher("~end_of_log", Bool, queue_size=1, latch=True)
 
         self.ci = CameraInfo(width=cp['width'], height=cp['height'],
                         K=[cp['fu'],0,cp['cx'],0,cp['fv'], cp['cy'],0,0,1],
@@ -74,6 +74,7 @@ class Player:
         base_frame = "true/world_frame"
 
         self.last_filename = None
+        self.new_file = True
 
         # T_cw
         camera_pose = TransformStamped()
@@ -90,6 +91,9 @@ class Player:
 
         self.file_list = zip(clist, dlist, js)
 
+        self.pub_eol.publish(data=False)
+        time.sleep(0.1)
+
         if self.args.service:
             rospy.Service("~reset", Empty, self.reset_iter)
             self.reset_iter(EmptyRequest())
@@ -104,18 +108,27 @@ class Player:
                         break
                     time.sleep(1/float(self.args.frequency))
 
+        self.pub_eol.publish(data=True)
+        time.sleep(0.1)
+
     def reset_iter(self, req):
         self.i = 0
+        if self.args.print_file and self.new_file:
+            print("-----------------------------------------------")
         return EmptyResponse()
 
     def next_set(self, req):
-        try:
-            cpath, dpath, jp = self.file_list[self.i]
-            self.send(cpath, dpath, jp)
-            self.i += 1
-        except StopIteration:
-            print("end of log")
-            rospy.signal_shutdown("end of log")
+        cpath, dpath, jp = self.file_list[self.i]
+        self.send(cpath, dpath, jp)
+        self.i += 1
+        if self.i == self.N:
+            if self.args.loop:
+                # reset automatically
+                self.reset_iter(EmptyRequest())
+            else:
+                self.pub_eol.publish(data=True)
+                print("end of log")
+                rospy.signal_shutdown("end of log")
         return EmptyResponse()
 
     def send(self, cpath, dpath, jp):
@@ -126,8 +139,9 @@ class Player:
 
         if self.args.print_file:
             filename = os.path.splitext(os.path.basename(cpath))[0]
-            if self.last_filename != filename:
-                print("cimg:", filename)
+            self.new_file = (self.last_filename != filename)
+            if self.new_file:
+                print("img:", filename)
             self.last_filename = filename
 
         self.camera_pose.header.stamp = hdr.stamp
