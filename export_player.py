@@ -27,20 +27,21 @@ class Player:
         parser.add_argument("-s", "--service", action='store_true', help="publish files on service")
         parser.add_argument("-f", "--frequency", type=float, default=30.0, help="replay frequency")
         parser.add_argument("-i", "--index", type=int, default=None, help="index of image")
-        args = parser.parse_args()
+        parser.add_argument("-p", "--print_file", action='store_true', default=False, help="print current file name")
+        self.args = parser.parse_args()
 
-        clist = sorted(glob.glob(os.path.join(args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
-        dlist = sorted(glob.glob(os.path.join(args.data_path, "depth", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
+        clist = sorted(glob.glob(os.path.join(self.args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
+        dlist = sorted(glob.glob(os.path.join(self.args.data_path, "depth", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
 
-        js = np.genfromtxt(os.path.join(args.data_path, "sol_joints.csv"), dtype=None, encoding="utf8", names=True)
+        js = np.genfromtxt(os.path.join(self.args.data_path, "sol_joints.csv"), dtype=None, encoding="utf8", names=True)
         self.joint_names = js.dtype.names
 
-        if args.index is not None:
-            clist = [clist[args.index]]
-            dlist = [dlist[args.index]]
-            js    = [js[args.index]]
+        if self.args.index is not None:
+            clist = [clist[self.args.index]]
+            dlist = [dlist[self.args.index]]
+            js    = [js[self.args.index]]
 
-        with open(os.path.join(args.data_path, "camera_parameters.json")) as f:
+        with open(os.path.join(self.args.data_path, "camera_parameters.json")) as f:
             cp = json.load(f)
 
         assert(len(clist)==len(dlist))
@@ -50,7 +51,7 @@ class Player:
 
         print("samples:", len(clist))
 
-        camera_pose_mat = np.loadtxt(os.path.join(args.data_path, "camera_pose.csv"), delimiter=' ')
+        camera_pose_mat = np.loadtxt(os.path.join(self.args.data_path, "camera_pose.csv"), delimiter=' ')
         # transformation from camera to world
         camera_pose_mat = np.linalg.inv(camera_pose_mat)
 
@@ -72,6 +73,8 @@ class Player:
         camera_frame = "true/camera_rgb_optical_frame"
         base_frame = "true/world_frame"
 
+        self.last_filename = None
+
         # T_cw
         camera_pose = TransformStamped()
         camera_pose.transform.translation = Vector3(x=camera_pose_mat[0,3], y=camera_pose_mat[1,3], z=camera_pose_mat[2,3])
@@ -87,7 +90,7 @@ class Player:
 
         self.file_list = zip(clist, dlist, js)
 
-        if args.service:
+        if self.args.service:
             rospy.Service("~reset", Empty, self.reset_iter)
             self.reset_iter(EmptyRequest())
             rospy.Service("~next", Empty, self.next_set)
@@ -121,7 +124,11 @@ class Player:
 
         self.pub_clock.publish(clock=now)
 
-        # print("cimg:", cpath)
+        if self.args.print_file:
+            filename = os.path.splitext(os.path.basename(cpath))[0]
+            if self.last_filename != filename:
+                print("cimg:", filename)
+            self.last_filename = filename
 
         self.camera_pose.header.stamp = hdr.stamp
         self.broadcaster.sendTransform(self.camera_pose)
