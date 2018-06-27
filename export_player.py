@@ -11,7 +11,6 @@ from sensor_msgs.msg import CompressedImage, Image, CameraInfo, JointState
 from rosgraph_msgs.msg import Clock
 from geometry_msgs.msg import TransformStamped, Vector3, Quaternion
 import cv_bridge
-from itertools import cycle
 import time
 import genpy
 import tf2_ros
@@ -45,6 +44,9 @@ class Player:
             cp = json.load(f)
 
         assert(len(clist)==len(dlist))
+
+        self.i = 0
+        self.N = len(clist)
 
         print("samples:", len(clist))
 
@@ -83,10 +85,7 @@ class Player:
 
         self.broadcaster = tf2_ros.StaticTransformBroadcaster()
 
-        if args.loop:
-            self.file_list = cycle(zip(clist, dlist, js))
-        else:
-            self.file_list = zip(clist, dlist, js)
+        self.file_list = zip(clist, dlist, js)
 
         if args.service:
             rospy.Service("~reset", Empty, self.reset_iter)
@@ -94,21 +93,23 @@ class Player:
             rospy.Service("~next", Empty, self.next_set)
             rospy.spin()
         else:
-            for cpath, dpath, jp in self.file_list:
-                self.send(cpath, dpath, jp)
-                if rospy.is_shutdown():
-                    break
-                time.sleep(1/float(args.frequency))
+            while self.args.loop and not rospy.is_shutdown():
+                for self.i in range(self.N):
+                    cpath, dpath, jp = self.file_list[self.i]
+                    self.send(cpath, dpath, jp)
+                    if rospy.is_shutdown():
+                        break
+                    time.sleep(1/float(self.args.frequency))
 
     def reset_iter(self, req):
-        # print("reset")
-        self.list_iter = iter(self.file_list)
+        self.i = 0
         return EmptyResponse()
 
     def next_set(self, req):
         try:
-            cpath, dpath, jp = self.list_iter.next()
+            cpath, dpath, jp = self.file_list[self.i]
             self.send(cpath, dpath, jp)
+            self.i += 1
         except StopIteration:
             print("end of log")
             rospy.signal_shutdown("end of log")
