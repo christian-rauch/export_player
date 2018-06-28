@@ -27,6 +27,7 @@ class Player:
         parser.add_argument("-s", "--service", action='store_true', help="publish files on service")
         parser.add_argument("-f", "--frequency", type=float, default=30.0, help="replay frequency")
         parser.add_argument("-i", "--index", type=int, default=None, help="index of image")
+        parser.add_argument("-j", "--end_range", type=int, default=None, help="last index of range")
         parser.add_argument("-p", "--print_file", action='store_true', default=False, help="print current file name")
         self.args = parser.parse_args()
 
@@ -36,10 +37,15 @@ class Player:
         js = np.genfromtxt(os.path.join(self.args.data_path, "sol_joints.csv"), dtype=None, encoding="utf8", names=True)
         self.joint_names = js.dtype.names
 
-        if self.args.index is not None:
-            clist = [clist[self.args.index]]
-            dlist = [dlist[self.args.index]]
-            js    = [js[self.args.index]]
+        if self.args.index:
+            if self.args.end_range:
+                clist = clist[self.args.index:self.args.end_range]
+                dlist = dlist[self.args.index:self.args.end_range]
+                js    = js[self.args.index:self.args.end_range]
+            else:
+                clist = [clist[self.args.index]]
+                dlist = [dlist[self.args.index]]
+                js    = [js[self.args.index]]
 
         with open(os.path.join(self.args.data_path, "camera_parameters.json")) as f:
             cp = json.load(f)
