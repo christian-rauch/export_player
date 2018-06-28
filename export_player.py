@@ -108,8 +108,8 @@ class Player:
                         break
                     time.sleep(1/float(self.args.frequency))
 
-        self.pub_eol.publish(data=True)
-        time.sleep(0.1)
+            self.pub_eol.publish(data=True)
+            time.sleep(0.1)
 
     def reset_iter(self, req):
         self.i = 0
