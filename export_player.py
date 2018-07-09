@@ -34,8 +34,16 @@ class Player:
         clist = sorted(glob.glob(os.path.join(self.args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
         dlist = sorted(glob.glob(os.path.join(self.args.data_path, "depth", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
 
-        js = np.genfromtxt(os.path.join(self.args.data_path, "sol_joints.csv"), dtype=None, encoding="utf8", names=True)
-        self.joint_names = js.dtype.names
+        js = None
+        for jf in ["sol_joints.csv", "joints.csv"]:
+            joint_file_path = os.path.join(self.args.data_path, jf)
+            if os.path.isfile(joint_file_path):
+                js = np.genfromtxt(joint_file_path, dtype=None, encoding="utf8", names=True)
+
+        if js is not None:
+            self.joint_names = js.dtype.names
+        else:
+            raise UserWarning("no joint file found")
 
         if self.args.index:
             if self.args.end_range:
