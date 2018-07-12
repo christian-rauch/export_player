@@ -114,13 +114,15 @@ class Player:
             rospy.Service("~next", Empty, self.next_set)
             rospy.spin()
         else:
-            while self.args.loop and not rospy.is_shutdown():
+            loop = True
+            while loop and not rospy.is_shutdown():
                 for self.i in range(self.N):
                     cpath, dpath, jp = self.file_list[self.i]
                     self.send(cpath, dpath, jp)
                     if rospy.is_shutdown():
                         break
                     time.sleep(1/float(self.args.frequency))
+                loop = self.args.loop
 
             self.pub_eol.publish(data=True)
             time.sleep(0.1)
