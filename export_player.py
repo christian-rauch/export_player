@@ -29,6 +29,7 @@ class Player:
         parser.add_argument("-i", "--index", type=int, default=None, help="index of image")
         parser.add_argument("-j", "--end_range", type=int, default=None, help="last index of range")
         parser.add_argument("-p", "--print_file", action='store_true', default=False, help="print current file name")
+        parser.add_argument("-c", "--cutoff", type=int, help="cutoff depth value in millimeter")
         self.args = parser.parse_args()
 
         clist = sorted(glob.glob(os.path.join(self.args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
@@ -169,6 +170,8 @@ class Player:
 
         dimg = cv2.imread(dpath, cv2.IMREAD_UNCHANGED)
         # msg_dimg = cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
+        if self.args.cutoff:
+            dimg[dimg>self.args.cutoff] = 0
         msg_dimg = self.cvbridge.cv2_to_imgmsg(dimg, encoding="mono16")
         msg_dimg.header = hdr
 
