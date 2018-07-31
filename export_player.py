@@ -40,6 +40,7 @@ class Player:
             joint_file_path = os.path.join(self.args.data_path, jf)
             if os.path.isfile(joint_file_path):
                 js = np.genfromtxt(joint_file_path, dtype=None, encoding="utf8", names=True)
+                break
 
         if js is not None:
             self.joint_names = js.dtype.names
