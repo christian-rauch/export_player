@@ -30,6 +30,7 @@ class Player:
         parser.add_argument("-j", "--end_range", type=int, default=None, help="last index of range")
         parser.add_argument("-p", "--print_file", action='store_true', default=False, help="print current file name")
         parser.add_argument("-c", "--cutoff", type=int, help="cutoff depth value in millimeter")
+        parser.add_argument("--skip", type=int, help="skip frames")
         self.args = parser.parse_args()
 
         clist = sorted(glob.glob(os.path.join(self.args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
@@ -56,6 +57,11 @@ class Player:
                 clist = [clist[self.args.index]]
                 dlist = [dlist[self.args.index]]
                 js    = [js[self.args.index]]
+
+        if self.args.skip:
+            clist = clist[::self.args.skip]
+            dlist = dlist[::self.args.skip]
+            js    = js[::self.args.skip]
 
         with open(os.path.join(self.args.data_path, "camera_parameters.json")) as f:
             cp = json.load(f)
