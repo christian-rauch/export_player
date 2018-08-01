@@ -139,6 +139,7 @@ class Player:
         self.i = 0
         if self.args.print_file and self.new_file:
             print("-----------------------------------------------")
+        self.pub_eol.publish(data=False)
         return EmptyResponse()
 
     def next_set(self, req):
@@ -146,11 +147,11 @@ class Player:
         self.send(cpath, dpath, jp)
         self.i += 1
         if self.i == self.N:
+            self.pub_eol.publish(data=True)
             if self.args.loop:
                 # reset automatically
                 self.reset_iter(EmptyRequest())
             else:
-                self.pub_eol.publish(data=True)
                 print("end of log")
                 rospy.signal_shutdown("end of log")
         return EmptyResponse()
