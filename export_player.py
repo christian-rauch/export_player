@@ -48,8 +48,8 @@ class Player:
         else:
             raise UserWarning("no joint file found")
 
-        if self.args.index:
-            if self.args.end_range:
+        if self.args.index is not None:
+            if self.args.end_range is not None:
                 clist = clist[self.args.index:self.args.end_range]
                 dlist = dlist[self.args.index:self.args.end_range]
                 js    = js[self.args.index:self.args.end_range]
