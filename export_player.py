@@ -6,7 +6,7 @@ import argparse
 import glob
 import os
 import json
-from std_msgs.msg import Header, Bool
+from std_msgs.msg import Header, Bool, UInt64
 from sensor_msgs.msg import CompressedImage, Image, CameraInfo, JointState
 from rosgraph_msgs.msg import Clock
 from geometry_msgs.msg import TransformStamped, Vector3, Quaternion
@@ -87,6 +87,8 @@ class Player:
         self.pub_ci_depth = rospy.Publisher("/camera/depth/camera_info", CameraInfo, latch=True, queue_size=1)
         self.pub_joints = rospy.Publisher("/joint_states", JointState, latch=True, queue_size=1)
         self.pub_eol = rospy.Publisher("~end_of_log", Bool, queue_size=1, latch=True)
+
+        self.pub_id = rospy.Publisher("~id", UInt64, queue_size=1, latch=True)
 
         self.ci = CameraInfo(width=cp['width'], height=cp['height'],
                         K=[cp['fu'],0,cp['cx'],0,cp['fv'], cp['cy'],0,0,1],
@@ -191,6 +193,8 @@ class Player:
         self.pub_ci_depth.publish(self.ci)
 
         self.pub_joints.publish(name=self.joint_names, position=jp, header=hdr)
+
+        self.pub_id.publish(data=(self.args.index+self.i))
 
 
 if __name__ == '__main__':
