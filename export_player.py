@@ -194,7 +194,10 @@ class Player:
 
         self.pub_joints.publish(name=self.joint_names, position=jp, header=hdr)
 
-        self.pub_id.publish(data=(self.args.index+self.i))
+        if self.args.index:
+            self.pub_id.publish(data=(self.args.index+self.i))
+        else:
+            self.pub_id.publish(data=(self.i))
 
 
 if __name__ == '__main__':
