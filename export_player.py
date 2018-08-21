@@ -95,20 +95,23 @@ class Player:
                         K=[cp['fu'],0,cp['cx'],0,cp['fv'], cp['cy'],0,0,1],
                         P=[cp['fu'],0,cp['cx'],0,0,cp['fv'],cp['cy'],0,0,0,1,0])
 
-        camera_frame = "true/camera_rgb_optical_frame"
-        base_frame = "true/world_frame"
-
         self.last_filename = None
         self.new_file = True
 
         # T_cw
-        camera_pose = TransformStamped()
-        camera_pose.transform.translation = Vector3(x=camera_pose_mat[0,3], y=camera_pose_mat[1,3], z=camera_pose_mat[2,3])
+        self.camera_pose = TransformStamped()
+        self.camera_pose.transform.translation = Vector3(x=camera_pose_mat[0, 3], y=camera_pose_mat[1, 3], z=camera_pose_mat[2, 3])
         q = quaternion_from_matrix(camera_pose_mat) # xyzw
-        camera_pose.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
-        camera_pose.child_frame_id = base_frame
-        camera_pose.header.frame_id = camera_frame
-        self.camera_pose = camera_pose
+        self.camera_pose.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
+        self.camera_pose.child_frame_id = "world_frame"
+        self.camera_pose.header.frame_id = "camera_rgb_optical_frame"
+
+        # publish the camera pose with tf prefix
+        tf_prefix = "true"
+        self.camera_pose_true = TransformStamped()
+        self.camera_pose_true.transform = self.camera_pose.transform
+        self.camera_pose_true.child_frame_id = tf_prefix+"/"+self.camera_pose.child_frame_id
+        self.camera_pose_true.header.frame_id = tf_prefix+"/"+self.camera_pose.header.frame_id
 
         self.cvbridge = cv_bridge.CvBridge()
 
@@ -174,6 +177,9 @@ class Player:
 
         self.camera_pose.header.stamp = hdr.stamp
         self.broadcaster.sendTransform(self.camera_pose)
+
+        self.camera_pose_true.header.stamp = hdr.stamp
+        self.broadcaster.sendTransform(self.camera_pose_true)
 
         cimg = cv2.imread(cpath, cv2.IMREAD_UNCHANGED)  # bgr8
         msg_cimg = self.cvbridge.cv2_to_compressed_imgmsg(cimg, dst_format="jpg")
