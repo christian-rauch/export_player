@@ -84,6 +84,7 @@ class Player:
         self.pub_ci_colour = rospy.Publisher("/camera/rgb/camera_info", CameraInfo, latch=True, queue_size=1)
         self.pub_depth = rospy.Publisher("/camera/depth/image_rect_raw", Image, queue_size=1)
         self.pub_depth_compressed = rospy.Publisher("/camera/depth/image_rect_raw/compressed", CompressedImage, queue_size=1)
+        self.pub_depth_compressed_depth = rospy.Publisher("/camera/depth/image_rect_raw/compressedDepth", CompressedImage, queue_size=1)
         self.pub_ci_depth = rospy.Publisher("/camera/depth/camera_info", CameraInfo, latch=True, queue_size=1)
         self.pub_joints = rospy.Publisher("/joint_states", JointState, latch=True, queue_size=1)
         self.pub_eol = rospy.Publisher("~end_of_log", Bool, queue_size=1, latch=True)
@@ -185,10 +186,16 @@ class Player:
         msg_dimg.header = hdr
         msg_dimg_compr = self.cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
         msg_dimg_compr.header = hdr
+        msg_dimg_compr_depth = CompressedImage()
+        msg_dimg_compr_depth.format = "16UC1; compressedDepth"
+        # prepend 12bit fake header
+        msg_dimg_compr_depth.data = "000000000000" + msg_dimg_compr.data
+        msg_dimg_compr_depth.header = hdr
 
         self.pub_colour.publish(msg_cimg)
         self.pub_depth.publish(msg_dimg)
         self.pub_depth_compressed.publish(msg_dimg_compr)
+        self.pub_depth_compressed_depth.publish(msg_dimg_compr_depth)
 
         self.ci.header = hdr
         self.pub_ci_colour.publish(self.ci)
