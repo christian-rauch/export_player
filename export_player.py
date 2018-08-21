@@ -82,8 +82,8 @@ class Player:
         self.pub_clock = rospy.Publisher("/clock", Clock, queue_size=1)
         self.pub_colour = rospy.Publisher("/camera/rgb/image_rect_color/compressed", CompressedImage, queue_size=1)
         self.pub_ci_colour = rospy.Publisher("/camera/rgb/camera_info", CameraInfo, latch=True, queue_size=1)
-        # pub_depth = rospy.Publisher("/camera/depth/image_rect_raw/compressed", CompressedImage, queue_size=1)
         self.pub_depth = rospy.Publisher("/camera/depth/image_rect_raw", Image, queue_size=1)
+        self.pub_depth_compressed = rospy.Publisher("/camera/depth/image_rect_raw/compressed", CompressedImage, queue_size=1)
         self.pub_ci_depth = rospy.Publisher("/camera/depth/camera_info", CameraInfo, latch=True, queue_size=1)
         self.pub_joints = rospy.Publisher("/joint_states", JointState, latch=True, queue_size=1)
         self.pub_eol = rospy.Publisher("~end_of_log", Bool, queue_size=1, latch=True)
@@ -179,14 +179,16 @@ class Player:
         msg_cimg.header = hdr
 
         dimg = cv2.imread(dpath, cv2.IMREAD_UNCHANGED)
-        # msg_dimg = cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
         if self.args.cutoff:
             dimg[dimg>self.args.cutoff] = 0
-        msg_dimg = self.cvbridge.cv2_to_imgmsg(dimg, encoding="mono16")
+        msg_dimg = self.cvbridge.cv2_to_imgmsg(dimg)
         msg_dimg.header = hdr
+        msg_dimg_compr = self.cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
+        msg_dimg_compr.header = hdr
 
         self.pub_colour.publish(msg_cimg)
         self.pub_depth.publish(msg_dimg)
+        self.pub_depth_compressed.publish(msg_dimg_compr)
 
         self.ci.header = hdr
         self.pub_ci_colour.publish(self.ci)
