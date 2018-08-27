@@ -131,11 +131,15 @@ class Player:
             loop = True
             while loop and not rospy.is_shutdown():
                 for self.i in range(self.N):
+                    tstart = time.time()
                     cpath, dpath, jp = self.file_list[self.i]
                     self.send(cpath, dpath, jp)
+                    dur = time.time()-tstart
                     if rospy.is_shutdown():
                         break
-                    time.sleep(1/float(self.args.frequency))
+                    delay = (1/float(self.args.frequency)-dur)
+                    delay = max(0,delay)
+                    time.sleep(delay)
                 loop = self.args.loop
 
             self.pub_eol.publish(data=True)
