@@ -170,13 +170,14 @@ class Player:
         now = genpy.Time().from_sec(time.time())
         hdr = Header(stamp=now, frame_id=self.camera_pose.header.frame_id)
 
-        self.pub_clock.publish(clock=now)
+        # index of image in original list
+        img_index = self.args.index+self.i if self.args.index else self.i
 
         if self.args.print_file:
             filename = os.path.splitext(os.path.basename(cpath))[0]
             self.new_file = (self.last_filename != filename)
             if self.new_file:
-                print("img:", filename)
+                print("img("+str(img_index)+"):", filename)
             self.last_filename = filename
 
         self.camera_pose.header.stamp = hdr.stamp
@@ -202,21 +203,22 @@ class Player:
         msg_dimg_compr_depth.data = "000000000000" + msg_dimg_compr.data
         msg_dimg_compr_depth.header = hdr
 
-        self.pub_colour.publish(msg_cimg)
-        self.pub_depth.publish(msg_dimg)
-        self.pub_depth_compressed.publish(msg_dimg_compr)
-        self.pub_depth_compressed_depth.publish(msg_dimg_compr_depth)
+        try:
+            self.pub_clock.publish(clock=now)
+            self.pub_colour.publish(msg_cimg)
+            self.pub_depth.publish(msg_dimg)
+            self.pub_depth_compressed.publish(msg_dimg_compr)
+            self.pub_depth_compressed_depth.publish(msg_dimg_compr_depth)
 
-        self.ci.header = hdr
-        self.pub_ci_colour.publish(self.ci)
-        self.pub_ci_depth.publish(self.ci)
+            self.ci.header = hdr
+            self.pub_ci_colour.publish(self.ci)
+            self.pub_ci_depth.publish(self.ci)
 
-        self.pub_joints.publish(name=self.joint_names, position=jp, header=hdr)
+            self.pub_joints.publish(name=self.joint_names, position=jp, header=hdr)
 
-        if self.args.index:
-            self.pub_id.publish(data=(self.args.index+self.i))
-        else:
-            self.pub_id.publish(data=(self.i))
+            self.pub_id.publish(data=img_index)
+        except rospy.ROSException:
+            pass
 
 
 if __name__ == '__main__':
