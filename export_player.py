@@ -77,6 +77,9 @@ class Player:
         # transformation from camera to world
         camera_pose_mat = np.linalg.inv(camera_pose_mat)
 
+        # time stamps in nanoseconds
+        timestamps = np.loadtxt(os.path.join(self.args.data_path, "time.csv"), dtype=np.uint).tolist()
+
         rospy.init_node("export_player")
 
         self.pub_clock = rospy.Publisher("/clock", Clock, queue_size=1)
@@ -117,10 +120,9 @@ class Player:
 
         self.broadcaster = tf2_ros.StaticTransformBroadcaster()
 
-        self.file_list = zip(clist, dlist, js)
+        self.file_list = zip(timestamps, clist, dlist, js)
 
         self.pub_eol.publish(data=False)
-        time.sleep(0.1)
 
         if self.args.service:
             rospy.Service("~reset", Empty, self.reset_iter)
@@ -132,8 +134,8 @@ class Player:
             while loop and not rospy.is_shutdown():
                 for self.i in range(self.N):
                     tstart = time.time()
-                    cpath, dpath, jp = self.file_list[self.i]
-                    self.send(cpath, dpath, jp)
+                    t, cpath, dpath, jp = self.file_list[self.i]
+                    self.send(cpath, dpath, jp, t)
                     dur = time.time()-tstart
                     if rospy.is_shutdown():
                         break
@@ -143,7 +145,6 @@ class Player:
                 loop = self.args.loop
 
             self.pub_eol.publish(data=True)
-            time.sleep(0.1)
 
     def reset_iter(self, req):
         self.i = 0
@@ -153,8 +154,8 @@ class Player:
         return EmptyResponse()
 
     def next_set(self, req):
-        cpath, dpath, jp = self.file_list[self.i]
-        self.send(cpath, dpath, jp)
+        t, cpath, dpath, jp = self.file_list[self.i]
+        self.send(cpath, dpath, jp, t)
         self.i += 1
         if self.i == self.N:
             self.pub_eol.publish(data=True)
@@ -166,8 +167,9 @@ class Player:
                 rospy.signal_shutdown("end of log")
         return EmptyResponse()
 
-    def send(self, cpath, dpath, jp):
-        now = genpy.Time().from_sec(time.time())
+    def send(self, cpath, dpath, jp, time_ns):
+        sec, nsec = divmod(time_ns, int(1e9))
+        now = genpy.Time(secs=sec, nsecs=nsec)
         hdr = Header(stamp=now, frame_id=self.camera_pose.header.frame_id)
 
         # index of image in original list
