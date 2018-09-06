@@ -83,7 +83,8 @@ class Player:
         rospy.init_node("export_player")
 
         self.pub_clock = rospy.Publisher("/clock", Clock, queue_size=1)
-        self.pub_colour = rospy.Publisher("/camera/rgb/image_rect_color/compressed", CompressedImage, queue_size=1)
+        self.pub_colour = rospy.Publisher("/camera/rgb/image_rect_color", Image, queue_size=1)
+        self.pub_colour_compressed = rospy.Publisher("/camera/rgb/image_rect_color/compressed", CompressedImage, queue_size=1)
         self.pub_ci_colour = rospy.Publisher("/camera/rgb/camera_info", CameraInfo, latch=True, queue_size=1)
         self.pub_depth = rospy.Publisher("/camera/depth/image_rect_raw", Image, queue_size=1)
         self.pub_depth_compressed = rospy.Publisher("/camera/depth/image_rect_raw/compressed", CompressedImage, queue_size=1)
@@ -189,8 +190,10 @@ class Player:
         self.broadcaster.sendTransform(self.camera_pose_true)
 
         cimg = cv2.imread(cpath, cv2.IMREAD_UNCHANGED)  # bgr8
-        msg_cimg = self.cvbridge.cv2_to_compressed_imgmsg(cimg, dst_format="jpg")
+        msg_cimg = self.cvbridge.cv2_to_imgmsg(cimg, encoding="bgr8")
         msg_cimg.header = hdr
+        msg_cimg_compr = self.cvbridge.cv2_to_compressed_imgmsg(cimg, dst_format="png")
+        msg_cimg_compr.header = hdr
 
         dimg = cv2.imread(dpath, cv2.IMREAD_UNCHANGED)
         if self.args.cutoff:
@@ -208,6 +211,7 @@ class Player:
         try:
             self.pub_clock.publish(clock=now)
             self.pub_colour.publish(msg_cimg)
+            self.pub_colour_compressed.publish(msg_cimg_compr)
             self.pub_depth.publish(msg_dimg)
             self.pub_depth_compressed.publish(msg_dimg_compr)
             self.pub_depth_compressed_depth.publish(msg_dimg_compr_depth)
