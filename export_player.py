@@ -36,6 +36,10 @@ class Player:
         clist = sorted(glob.glob(os.path.join(self.args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
         dlist = sorted(glob.glob(os.path.join(self.args.data_path, "depth", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
 
+        if len(clist)!=len(dlist):
+            raise UserWarning("number of images mismatch")
+        index = np.arange(0, len(clist))
+
         js = None
         for jf in ["sol_joints.csv", "joints.csv"]:
             joint_file_path = os.path.join(self.args.data_path, jf)
@@ -53,15 +57,18 @@ class Player:
                 clist = clist[self.args.index:self.args.end_range]
                 dlist = dlist[self.args.index:self.args.end_range]
                 js    = js[self.args.index:self.args.end_range]
+                index = index[self.args.index:self.args.end_range]
             else:
                 clist = [clist[self.args.index]]
                 dlist = [dlist[self.args.index]]
                 js    = [js[self.args.index]]
+                index = [index[self.args.index]]
 
         if self.args.skip:
             clist = clist[::self.args.skip]
             dlist = dlist[::self.args.skip]
             js    = js[::self.args.skip]
+            index = index[::self.args.skip]
 
         with open(os.path.join(self.args.data_path, "camera_parameters.json")) as f:
             cp = json.load(f)
@@ -121,7 +128,7 @@ class Player:
 
         self.broadcaster = tf2_ros.StaticTransformBroadcaster()
 
-        self.file_list = zip(timestamps, clist, dlist, js)
+        self.file_list = zip(index, timestamps, clist, dlist, js)
 
         self.pub_eol.publish(data=False)
 
@@ -135,8 +142,8 @@ class Player:
             while loop and not rospy.is_shutdown():
                 for self.i in range(self.N):
                     tstart = time.time()
-                    t, cpath, dpath, jp = self.file_list[self.i]
-                    self.send(cpath, dpath, jp, t)
+                    ind, t, cpath, dpath, jp = self.file_list[self.i]
+                    self.send(cpath, dpath, jp, t, ind)
                     dur = time.time()-tstart
                     if rospy.is_shutdown():
                         break
@@ -155,8 +162,8 @@ class Player:
         return EmptyResponse()
 
     def next_set(self, req):
-        t, cpath, dpath, jp = self.file_list[self.i]
-        self.send(cpath, dpath, jp, t)
+        ind, t, cpath, dpath, jp = self.file_list[self.i]
+        self.send(cpath, dpath, jp, t, ind)
         self.i += 1
         if self.i == self.N:
             self.pub_eol.publish(data=True)
@@ -168,13 +175,13 @@ class Player:
                 rospy.signal_shutdown("end of log")
         return EmptyResponse()
 
-    def send(self, cpath, dpath, jp, time_ns):
+    def send(self, cpath, dpath, jp, time_ns, ind):
         sec, nsec = divmod(time_ns, int(1e9))
         now = genpy.Time(secs=sec, nsecs=nsec)
         hdr = Header(stamp=now, frame_id=self.camera_pose.header.frame_id)
 
         # index of image in original list
-        img_index = self.args.index+self.i if self.args.index else self.i
+        img_index = ind
 
         if self.args.print_file:
             filename = os.path.splitext(os.path.basename(cpath))[0]
