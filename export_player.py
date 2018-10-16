@@ -81,7 +81,18 @@ class Player:
 
         print("samples:", len(clist))
 
-        camera_pose_mat = np.loadtxt(os.path.join(self.args.data_path, "camera_pose.csv"), delimiter=' ')
+        # list of camera poses per image
+        camera_poses = np.loadtxt(os.path.join(self.args.data_path, "camera_pose.csv"), skiprows=1, delimiter=' ')
+        if camera_poses.shape[1]==7:
+            # list of camera poses, px py pz, qw qx qy qz
+            camera_pose = camera_poses[0]   # chose first camera pose as static
+            # camera_pose_mat = np.identity(4)
+            camera_pose_mat = quaternion_matrix([camera_pose[3+1], camera_pose[3+2], camera_pose[3+3], camera_pose[3+0]])  # xyzw
+            camera_pose_mat[:3,3] = camera_pose[:3]
+        else:
+            # single static camera pose
+            camera_pose_mat = np.loadtxt(os.path.join(self.args.data_path, "camera_pose.csv"), delimiter=' ')
+
         # transformation from camera to world
         camera_pose_mat = np.linalg.inv(camera_pose_mat)
 
