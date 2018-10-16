@@ -30,6 +30,7 @@ class Player:
         parser.add_argument("-j", "--end_range", type=int, default=None, help="last index of range")
         parser.add_argument("-p", "--print_file", action='store_true', default=False, help="print current file name")
         parser.add_argument("-c", "--cutoff", type=int, help="cutoff depth value in millimeter")
+        parser.add_argument("-t", "--time", action='store_true', help="stamp messages with real wall clock time")
         parser.add_argument("--skip", type=int, help="skip frames")
         self.args = parser.parse_args()
 
@@ -176,6 +177,8 @@ class Player:
         return EmptyResponse()
 
     def send(self, cpath, dpath, jp, time_ns, ind):
+        if self.args.time:
+            time_ns = int(time.time()*1e9)
         sec, nsec = divmod(time_ns, int(1e9))
         now = genpy.Time(secs=sec, nsecs=nsec)
         hdr = Header(stamp=now, frame_id=self.camera_pose.header.frame_id)
