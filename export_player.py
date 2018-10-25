@@ -222,6 +222,9 @@ class Player:
         msg_dimg = self.cvbridge.cv2_to_imgmsg(dimg)
         msg_dimg.header = hdr
         msg_dimg_compr = self.cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
+        # should be   `format: "16UC1; png compressed "`
+        # see: https://github.com/ros-perception/vision_opencv/issues/250
+        msg_dimg_compr.format = "16UC1; png compressed"
         msg_dimg_compr.header = hdr
         msg_dimg_compr_depth = CompressedImage()
         msg_dimg_compr_depth.format = "16UC1; compressedDepth"
