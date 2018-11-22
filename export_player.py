@@ -129,13 +129,6 @@ class Player:
         self.camera_pose.child_frame_id = "table"
         self.camera_pose.header.frame_id = "camera_rgb_optical_frame"
 
-        # publish the camera pose with tf prefix
-        tf_prefix = "true"
-        self.camera_pose_true = TransformStamped()
-        self.camera_pose_true.transform = self.camera_pose.transform
-        self.camera_pose_true.child_frame_id = tf_prefix+"/"+self.camera_pose.child_frame_id
-        self.camera_pose_true.header.frame_id = tf_prefix+"/"+self.camera_pose.header.frame_id
-
         self.cvbridge = cv_bridge.CvBridge()
 
         self.broadcaster = tf2_ros.StaticTransformBroadcaster()
@@ -209,9 +202,6 @@ class Player:
 
         self.camera_pose.header.stamp = hdr.stamp
         self.broadcaster.sendTransform(self.camera_pose)
-
-        self.camera_pose_true.header.stamp = hdr.stamp
-        self.broadcaster.sendTransform(self.camera_pose_true)
 
         cimg = cv2.imread(cpath, cv2.IMREAD_UNCHANGED)  # bgr8
         msg_cimg = self.cvbridge.cv2_to_imgmsg(cimg, encoding="bgr8")
