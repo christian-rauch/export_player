@@ -126,7 +126,7 @@ class Player:
         self.camera_pose.transform.translation = Vector3(x=camera_pose_mat[0, 3], y=camera_pose_mat[1, 3], z=camera_pose_mat[2, 3])
         q = quaternion_from_matrix(camera_pose_mat) # xyzw
         self.camera_pose.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
-        self.camera_pose.child_frame_id = "world_frame"
+        self.camera_pose.child_frame_id = "table"
         self.camera_pose.header.frame_id = "camera_rgb_optical_frame"
 
         # publish the camera pose with tf prefix
