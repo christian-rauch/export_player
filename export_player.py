@@ -34,6 +34,9 @@ class Player:
         parser.add_argument("--skip", type=int, help="skip frames")
         self.args = parser.parse_args()
 
+        if not os.path.isdir(self.args.data_path):
+            parser.error("directory '"+self.args.data_path+"' does not exist")
+
         clist = sorted(glob.glob(os.path.join(self.args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
         dlist = sorted(glob.glob(os.path.join(self.args.data_path, "depth", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
 
