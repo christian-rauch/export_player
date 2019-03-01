@@ -82,7 +82,7 @@ class Player:
         self.i = 0
         self.N = len(clist)
 
-        print("samples:", len(clist))
+        print("samples:", self.N)
 
         # list of camera poses per image
         camera_poses = np.loadtxt(os.path.join(self.args.data_path, "camera_pose.csv"), skiprows=1, delimiter=' ')
@@ -98,6 +98,12 @@ class Player:
 
         # transformation from camera to world
         camera_pose_mat = np.linalg.inv(camera_pose_mat)
+
+        vicon_path = os.path.join(self.args.data_path, "vicon_pose_lwr_end_effector.csv")
+        if os.path.exists(vicon_path):
+            self.vicon_poses = np.loadtxt(os.path.join(self.args.data_path, "vicon_pose_lwr_end_effector.csv"), skiprows=0, delimiter=' ')
+        else:
+            self.vicon_poses = None
 
         # time stamps in nanoseconds
         timestamps = np.loadtxt(os.path.join(self.args.data_path, "time.csv"), dtype=np.uint).tolist()
@@ -205,6 +211,16 @@ class Player:
 
         self.camera_pose.header.stamp = hdr.stamp
         self.broadcaster.sendTransform(self.camera_pose)
+
+        if self.vicon_poses is not None and img_index < len(self.vicon_poses):
+            # px,py,pz,qw,qx,qy,qz
+            vicon_pose = self.vicon_poses[img_index]
+            vicon_tf = TransformStamped()
+            vicon_tf.transform.translation = Vector3(x=vicon_pose[0], y=vicon_pose[1], z=vicon_pose[2])
+            vicon_tf.transform.rotation = Quaternion(w=vicon_pose[3], x=vicon_pose[4], y=vicon_pose[5], z=vicon_pose[6])
+            vicon_tf.header.frame_id = "table"
+            vicon_tf.child_frame_id = "vicon_end_effector"
+            self.broadcaster.sendTransform(vicon_tf)
 
         cimg = cv2.imread(cpath, cv2.IMREAD_UNCHANGED)  # bgr8
         msg_cimg = self.cvbridge.cv2_to_imgmsg(cimg, encoding="bgr8")
