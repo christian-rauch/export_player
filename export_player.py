@@ -40,6 +40,9 @@ class Player:
         clist = sorted(glob.glob(os.path.join(self.args.data_path, "colour", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
         dlist = sorted(glob.glob(os.path.join(self.args.data_path, "depth", "*.png")), key=lambda x: int(filter(str.isdigit, x)))
 
+        if len(clist)==0 or len(dlist)==0:
+            raise UserWarning("no images found")
+
         if len(clist)!=len(dlist):
             raise UserWarning("number of images mismatch")
         index = np.arange(0, len(clist))
@@ -268,4 +271,7 @@ class Player:
 
 
 if __name__ == '__main__':
-    Player()
+    try:
+        Player()
+    except UserWarning as e:
+        print(e.message)
