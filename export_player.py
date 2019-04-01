@@ -105,9 +105,6 @@ class Player:
         else:
             self.vicon_poses = None
 
-        # time stamps in nanoseconds
-        timestamps = np.loadtxt(os.path.join(self.args.data_path, "time.csv"), dtype=np.uint).tolist()
-
         rospy.init_node("export_player")
 
         self.pub_clock = rospy.Publisher("/clock", Clock, queue_size=1)
@@ -141,6 +138,13 @@ class Player:
         self.cvbridge = cv_bridge.CvBridge()
 
         self.broadcaster = tf2_ros.StaticTransformBroadcaster()
+
+        if self.args.time:
+            # timestamps will be ignored and replaced by current time
+            timestamps = [None] * len(clist)
+        else:
+            # load time stamps in nanoseconds
+            timestamps = np.loadtxt(os.path.join(self.args.data_path, "time.csv"), dtype=np.uint).tolist()
 
         self.file_list = zip(index, timestamps, clist, dlist, js)
 
