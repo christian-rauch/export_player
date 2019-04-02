@@ -89,20 +89,8 @@ class Player:
 
         print("samples:", self.N)
 
-        # list of camera poses per image
+        # list of camera poses per image, order: px py pz, qw qx qy qz
         camera_poses = np.loadtxt(os.path.join(self.args.data_path, "camera_pose.csv"), skiprows=1, delimiter=' ')
-        if camera_poses.shape[1]==7:
-            # list of camera poses, px py pz, qw qx qy qz
-            camera_pose = camera_poses[0]   # chose first camera pose as static
-            # camera_pose_mat = np.identity(4)
-            camera_pose_mat = quaternion_matrix([camera_pose[3+1], camera_pose[3+2], camera_pose[3+3], camera_pose[3+0]])  # xyzw
-            camera_pose_mat[:3,3] = camera_pose[:3]
-        else:
-            # single static camera pose
-            camera_pose_mat = np.loadtxt(os.path.join(self.args.data_path, "camera_pose.csv"), delimiter=' ')
-
-        # transformation from camera to world
-        camera_pose_mat = np.linalg.inv(camera_pose_mat)
 
         vicon_path = os.path.join(self.args.data_path, "vicon_pose_lwr_end_effector.csv")
         if os.path.exists(vicon_path):
@@ -132,17 +120,9 @@ class Player:
         self.last_filename = None
         self.new_file = True
 
-        # T_cw
-        self.camera_pose = TransformStamped()
-        self.camera_pose.transform.translation = Vector3(x=camera_pose_mat[0, 3], y=camera_pose_mat[1, 3], z=camera_pose_mat[2, 3])
-        q = quaternion_from_matrix(camera_pose_mat) # xyzw
-        self.camera_pose.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
-        self.camera_pose.child_frame_id = self.args.base_frame
-        self.camera_pose.header.frame_id = self.args.camera_frame
-
         self.cvbridge = cv_bridge.CvBridge()
 
-        self.broadcaster = tf2_ros.StaticTransformBroadcaster()
+        self.broadcaster = tf2_ros.TransformBroadcaster()
 
         if self.args.time:
             # timestamps will be ignored and replaced by current time
@@ -151,7 +131,7 @@ class Player:
             # load time stamps in nanoseconds
             timestamps = np.loadtxt(os.path.join(self.args.data_path, "time.csv"), dtype=np.uint).tolist()
 
-        self.file_list = zip(index, timestamps, clist, dlist, js)
+        self.file_list = zip(index, timestamps, clist, dlist, js, camera_poses)
 
         if not self.args.loop:
             self.pub_eol.publish(data=False)
@@ -166,8 +146,8 @@ class Player:
             while loop and not rospy.is_shutdown():
                 for self.i in range(self.N):
                     tstart = time.time()
-                    ind, t, cpath, dpath, jp = self.file_list[self.i]
-                    self.send(cpath, dpath, jp, t, ind)
+                    ind, t, cpath, dpath, jp, cpose = self.file_list[self.i]
+                    self.send(cpath, dpath, jp, t, ind, cpose)
                     dur = time.time()-tstart
                     if rospy.is_shutdown():
                         break
@@ -188,8 +168,8 @@ class Player:
         return EmptyResponse()
 
     def next_set(self, req):
-        ind, t, cpath, dpath, jp = self.file_list[self.i]
-        self.send(cpath, dpath, jp, t, ind)
+        ind, t, cpath, dpath, jp, cpose = self.file_list[self.i]
+        self.send(cpath, dpath, jp, t, ind, cpose)
         self.i += 1
         if self.i == self.N:
             if self.args.loop:
@@ -201,12 +181,12 @@ class Player:
                 rospy.signal_shutdown("end of log")
         return EmptyResponse()
 
-    def send(self, cpath, dpath, jp, time_ns, ind):
+    def send(self, cpath, dpath, jp, time_ns, ind, cpose):
         if self.args.time:
             time_ns = int(time.time()*1e9)
         sec, nsec = divmod(time_ns, int(1e9))
         now = genpy.Time(secs=sec, nsecs=nsec)
-        hdr = Header(stamp=now, frame_id=self.camera_pose.header.frame_id)
+        hdr = Header(stamp=now, frame_id=self.args.camera_frame)
 
         # index of image in original list
         img_index = ind
@@ -218,8 +198,20 @@ class Player:
                 print("img("+str(img_index)+"):", filename)
             self.last_filename = filename
 
-        self.camera_pose.header.stamp = hdr.stamp
-        self.broadcaster.sendTransform(self.camera_pose)
+        # T_cw
+        camera_pose = TransformStamped()
+        camera_pose.header.stamp = hdr.stamp
+        camera_pose.header.frame_id = self.args.camera_frame
+        camera_pose.child_frame_id = self.args.base_frame
+        # invert camera pose
+        camera_pose_mat = np.dot(translation_matrix(cpose[:3]), quaternion_matrix([cpose[4], cpose[5], cpose[6], cpose[3]]))  # xyzw
+        camera_pose_mat = np.linalg.inv(camera_pose_mat)
+        p = translation_from_matrix(camera_pose_mat)
+        q = quaternion_from_matrix(camera_pose_mat)
+        camera_pose.transform.translation = Vector3(x=p[0], y=p[1], z=p[2]) # xyzw
+        camera_pose.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
+
+        self.broadcaster.sendTransform(camera_pose)
 
         if self.vicon_poses is not None and img_index < len(self.vicon_poses):
             # px,py,pz,qw,qx,qy,qz
