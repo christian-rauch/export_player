@@ -24,13 +24,15 @@ class Player:
         parser = argparse.ArgumentParser()
         parser.add_argument("data_path", type=str, help="path to data")
         parser.add_argument("-l", "--loop", action='store_true', help="loop over files")
-        parser.add_argument("-s", "--service", action='store_true', help="publish files on service")
+        parser.add_argument("-s", "--service", action='store_true', help="publish files on service call")
         parser.add_argument("-f", "--frequency", type=float, default=30.0, help="replay frequency")
-        parser.add_argument("-i", "--index", type=int, default=None, help="index of image")
-        parser.add_argument("-j", "--end_range", type=int, default=None, help="last index of range")
+        parser.add_argument("-i", "--index", type=int, default=None, help="start index of image range")
+        parser.add_argument("-j", "--end_range", type=int, default=None, help="end index of image range")
         parser.add_argument("-p", "--print_file", action='store_true', default=False, help="print current file name")
         parser.add_argument("-c", "--cutoff", type=int, help="cutoff depth value in millimeter")
         parser.add_argument("-t", "--time", action='store_true', help="stamp messages with real wall clock time")
+        parser.add_argument("-bf", "--base_frame", type=str, default="world", help="base frame")
+        parser.add_argument("-cf", "--camera_frame", type=str, default="camera_rgb_optical_frame", help="camera frame")
         parser.add_argument("--skip", type=int, help="skip frames")
         self.args = parser.parse_args()
 
@@ -135,8 +137,8 @@ class Player:
         self.camera_pose.transform.translation = Vector3(x=camera_pose_mat[0, 3], y=camera_pose_mat[1, 3], z=camera_pose_mat[2, 3])
         q = quaternion_from_matrix(camera_pose_mat) # xyzw
         self.camera_pose.transform.rotation = Quaternion(x=q[0], y=q[1], z=q[2], w=q[3])
-        self.camera_pose.child_frame_id = "table"
-        self.camera_pose.header.frame_id = "camera_rgb_optical_frame"
+        self.camera_pose.child_frame_id = self.args.base_frame
+        self.camera_pose.header.frame_id = self.args.camera_frame
 
         self.cvbridge = cv_bridge.CvBridge()
 
@@ -225,7 +227,7 @@ class Player:
             vicon_tf = TransformStamped()
             vicon_tf.transform.translation = Vector3(x=vicon_pose[0], y=vicon_pose[1], z=vicon_pose[2])
             vicon_tf.transform.rotation = Quaternion(w=vicon_pose[3], x=vicon_pose[4], y=vicon_pose[5], z=vicon_pose[6])
-            vicon_tf.header.frame_id = "table"
+            vicon_tf.header.frame_id = self.args.base_frame
             vicon_tf.child_frame_id = "vicon_end_effector"
             self.broadcaster.sendTransform(vicon_tf)
 
