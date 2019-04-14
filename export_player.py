@@ -84,11 +84,6 @@ class Player:
 
         assert(len(clist)==len(dlist))
 
-        self.i = 0
-        self.N = len(clist)
-
-        print("samples:", self.N)
-
         # list of camera poses per image, order: px py pz, qw qx qy qz
         camera_poses = np.loadtxt(os.path.join(self.args.data_path, "camera_pose.csv"), skiprows=1, delimiter=' ')
 
@@ -132,6 +127,11 @@ class Player:
             timestamps = np.loadtxt(os.path.join(self.args.data_path, "time.csv"), dtype=np.uint).tolist()
 
         self.file_list = zip(index, timestamps, clist, dlist, js, camera_poses)
+
+        self.i = 0
+        self.N = len(self.file_list)
+
+        print("samples:", self.N)
 
         if not self.args.loop:
             self.pub_eol.publish(data=False)
