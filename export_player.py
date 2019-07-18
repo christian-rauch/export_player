@@ -34,6 +34,7 @@ class Player:
         parser.add_argument("-bf", "--base_frame", type=str, default="world", help="base frame")
         parser.add_argument("-cf", "--camera_frame", type=str, default="camera_rgb_optical_frame", help="camera frame")
         parser.add_argument("--skip", type=int, help="skip frames")
+        parser.add_argument("--raw", action='store_true', help="decode PNG files and publish raw image messages")
         self.args = parser.parse_args()
 
         if not os.path.isdir(self.args.data_path):
@@ -96,10 +97,11 @@ class Player:
         rospy.init_node("export_player")
 
         self.pub_clock = rospy.Publisher("/clock", Clock, queue_size=1)
-        self.pub_colour = rospy.Publisher("/camera/rgb/image_rect_color", Image, queue_size=1)
+        if self.args.raw:
+            self.pub_colour = rospy.Publisher("/camera/rgb/image_rect_color", Image, queue_size=1)
+            self.pub_depth = rospy.Publisher("/camera/depth/image_rect_raw", Image, queue_size=1)
         self.pub_colour_compressed = rospy.Publisher("/camera/rgb/image_rect_color/compressed", CompressedImage, queue_size=1)
         self.pub_ci_colour = rospy.Publisher("/camera/rgb/camera_info", CameraInfo, latch=True, queue_size=1)
-        self.pub_depth = rospy.Publisher("/camera/depth/image_rect_raw", Image, queue_size=1)
         self.pub_depth_compressed = rospy.Publisher("/camera/depth/image_rect_raw/compressed", CompressedImage, queue_size=1)
         self.pub_depth_compressed_depth = rospy.Publisher("/camera/depth/image_rect_raw/compressedDepth", CompressedImage, queue_size=1)
         self.pub_ci_depth = rospy.Publisher("/camera/depth/camera_info", CameraInfo, latch=True, queue_size=1)
@@ -223,33 +225,40 @@ class Player:
             vicon_tf.child_frame_id = "vicon_end_effector"
             self.broadcaster.sendTransform(vicon_tf)
 
-        cimg = cv2.imread(cpath, cv2.IMREAD_UNCHANGED)  # bgr8
-        msg_cimg = self.cvbridge.cv2_to_imgmsg(cimg, encoding="bgr8")
-        msg_cimg.header = hdr
-        msg_cimg_compr = self.cvbridge.cv2_to_compressed_imgmsg(cimg, dst_format="png")
-        msg_cimg_compr.header = hdr
+        with open(cpath, mode='rb') as f:
+            cimg_buf = f.read()
+            msg_cimg_compr = CompressedImage()
+            msg_cimg_compr.header = hdr
+            msg_cimg_compr.format = "png"
+            msg_cimg_compr.data = cimg_buf
 
-        dimg = cv2.imread(dpath, cv2.IMREAD_UNCHANGED)
-        if self.args.cutoff:
-            dimg[dimg>self.args.cutoff] = 0
-        msg_dimg = self.cvbridge.cv2_to_imgmsg(dimg)
-        msg_dimg.header = hdr
-        msg_dimg_compr = self.cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
-        # should be   `format: "16UC1; png compressed "`
-        # see: https://github.com/ros-perception/vision_opencv/issues/250
-        msg_dimg_compr.format = "16UC1; png compressed"
-        msg_dimg_compr.header = hdr
-        msg_dimg_compr_depth = CompressedImage()
-        msg_dimg_compr_depth.format = "16UC1; compressedDepth"
-        # prepend 12bit fake header
-        msg_dimg_compr_depth.data = "000000000000" + msg_dimg_compr.data
-        msg_dimg_compr_depth.header = hdr
+            if self.args.raw:
+                cimg = cv2.imdecode(np.fromstring(cimg_buf, dtype=np.uint8), cv2.IMREAD_UNCHANGED) # bgr8
+                msg_cimg = self.cvbridge.cv2_to_imgmsg(cimg, encoding="bgr8")
+
+        with open(dpath, mode='rb') as f:
+            dimg_buf = f.read()
+            msg_dimg_compr = CompressedImage()
+            msg_dimg_compr.header = hdr
+            msg_dimg_compr.format = "16UC1; png compressed"
+            msg_dimg_compr.data = dimg_buf
+
+            msg_dimg_compr_depth = CompressedImage()
+            msg_dimg_compr_depth.header = hdr
+            msg_dimg_compr_depth.format = "16UC1; compressedDepth"
+            # prepend 12bit fake header
+            msg_dimg_compr_depth.data = "000000000000" + dimg_buf
+
+            if self.args.raw:
+                dimg = cv2.imdecode(np.fromstring(dimg_buf, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+                msg_dimg = self.cvbridge.cv2_to_imgmsg(dimg, encoding="16UC1")
 
         try:
             self.pub_clock.publish(clock=now)
-            self.pub_colour.publish(msg_cimg)
+            if self.args.raw:
+                self.pub_colour.publish(msg_cimg)
+                self.pub_depth.publish(msg_dimg)
             self.pub_colour_compressed.publish(msg_cimg_compr)
-            self.pub_depth.publish(msg_dimg)
             self.pub_depth_compressed.publish(msg_dimg_compr)
             self.pub_depth_compressed_depth.publish(msg_dimg_compr_depth)
 
