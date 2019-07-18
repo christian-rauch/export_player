@@ -182,6 +182,7 @@ class Player:
         return EmptyResponse()
 
     def send(self, cpath, dpath, jp, time_ns, ind, cpose):
+        tstart = time.time()
         if self.args.time:
             time_ns = int(time.time()*1e9)
         sec, nsec = divmod(time_ns, int(1e9))
@@ -223,16 +224,23 @@ class Player:
             vicon_tf.child_frame_id = "vicon_end_effector"
             self.broadcaster.sendTransform(vicon_tf)
 
+        print("transf", time.time()-tstart)
+
+        start_read_col = time.time()
         cimg = cv2.imread(cpath, cv2.IMREAD_UNCHANGED)  # bgr8
         msg_cimg = self.cvbridge.cv2_to_imgmsg(cimg, encoding="bgr8")
+        print("read col", time.time() - start_read_col)
         msg_cimg.header = hdr
         msg_cimg_compr = self.cvbridge.cv2_to_compressed_imgmsg(cimg, dst_format="png")
         msg_cimg_compr.header = hdr
+        print("read col2", time.time() - start_read_col)
 
+        start_read_dep = time.time()
         dimg = cv2.imread(dpath, cv2.IMREAD_UNCHANGED)
         if self.args.cutoff:
             dimg[dimg>self.args.cutoff] = 0
         msg_dimg = self.cvbridge.cv2_to_imgmsg(dimg)
+        print("read dep", time.time() - start_read_dep)
         msg_dimg.header = hdr
         msg_dimg_compr = self.cvbridge.cv2_to_compressed_imgmsg(dimg, dst_format="png")
         # should be   `format: "16UC1; png compressed "`
@@ -244,6 +252,9 @@ class Player:
         # prepend 12bit fake header
         msg_dimg_compr_depth.data = "000000000000" + msg_dimg_compr.data
         msg_dimg_compr_depth.header = hdr
+        print("read dep2", time.time() - start_read_dep)
+
+        print("read", time.time() - tstart)
 
         try:
             self.pub_clock.publish(clock=now)
@@ -262,6 +273,8 @@ class Player:
             self.pub_id.publish(data=img_index)
         except rospy.ROSException:
             pass
+
+        print("pub", time.time() - tstart)
 
 
 if __name__ == '__main__':
