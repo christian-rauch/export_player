@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 from __future__ import print_function
+import os
+# multithreading in OpenBLAS is very inefficient for small matrices
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 import rospy
 import cv2
 import argparse
 import glob
-import os
 import json
 from std_msgs.msg import Header, Bool, UInt64
 from sensor_msgs.msg import CompressedImage, Image, CameraInfo, JointState
