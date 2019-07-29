@@ -273,7 +273,9 @@ class Player:
             jp2 = jp.view((float, len(jp.dtype.names))).copy()
             jp2[-3:] *= 85
             jp2 = np.append(jp2, [0,0,0])
-            jp2[1] += 0.04
+            jp2[1] += 0.02
+            jp2[2] -= 0.05
+            jp2[4] -= 0.3
             self.pub_joints.publish(name=self.joint_names, position=jp2, header=hdr)
 
             self.pub_id.publish(data=img_index)
