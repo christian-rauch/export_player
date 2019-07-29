@@ -61,6 +61,8 @@ class Player:
 
         if js is not None:
             self.joint_names = js.dtype.names
+            self.joint_names = list(self.joint_names)
+            self.joint_names.extend(["j2n6s300_joint_finger_tip_1", "j2n6s300_joint_finger_tip_2", "j2n6s300_joint_finger_tip_3"])
         else:
             raise UserWarning("no joint file found")
 
@@ -268,7 +270,10 @@ class Player:
             self.pub_ci_colour.publish(self.ci)
             self.pub_ci_depth.publish(self.ci)
 
-            self.pub_joints.publish(name=self.joint_names, position=jp, header=hdr)
+            jp2 = jp.view((float, len(jp.dtype.names))).copy()
+            jp2[-3:] *= 85
+            jp2 = np.append(jp2, [0,0,0])
+            self.pub_joints.publish(name=self.joint_names, position=jp2, header=hdr)
 
             self.pub_id.publish(data=img_index)
         except rospy.ROSException:
