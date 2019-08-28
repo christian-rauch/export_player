@@ -37,7 +37,7 @@ class Player:
         parser.add_argument("-cf", "--camera_frame", type=str, default="camera_rgb_optical_frame", help="camera frame")
         parser.add_argument("--skip", type=int, help="skip frames")
         parser.add_argument("--raw", action='store_true', help="decode PNG files and publish raw image messages")
-        self.args = parser.parse_args()
+        self.args = parser.parse_args(args=rospy.myargv()[1:])
 
         if not os.path.isdir(self.args.data_path):
             parser.error("directory '"+self.args.data_path+"' does not exist")
