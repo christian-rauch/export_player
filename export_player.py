@@ -276,7 +276,11 @@ class Player:
 
 
 if __name__ == '__main__':
+    import sys
     try:
         Player()
     except UserWarning as e:
         print(e.message)
+        sys.exit(1) # FAILURE
+    else:
+        sys.exit(0) # SUCCESS
